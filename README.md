@@ -6,10 +6,49 @@ A personal trading data pipeline for JP equities that ingests OHLCV market data,
 
 Python, PostgreSQL/TimescaleDB, psycopg, pandas, yfinance, mplfinance, Streamlit, Docker Compose
 
-## Data Flow
+## Architecture
 
-yfinance → ingest → TimescaleDB hypertable → OHLCV bars chart
-Broker CSV → trades database → (overlay) → chart
+```mermaid
+flowchart LR
+    subgraph SRC[Sources]
+        YF[yfinance API]
+        CSV[Broker CSV<br/>CP932 · fixed layout]
+    end
+
+    subgraph ING[ingest container]
+        BF[backfill_bars.py]
+        IT[import_trades.py]
+    end
+
+    subgraph DB[timescaledb container]
+        SYM[(symbols)]
+        BARS[(bars<br/>hypertable · 30d chunks)]
+        TR[(trades)]
+    end
+
+    subgraph OUT[consumers]
+        AN[analysis container<br/>plot_trades.py]
+        WEB[web container<br/>Streamlit]
+    end
+
+    YF --> BF
+    CSV --> IT
+    BF --> SYM
+    IT --> SYM
+    BF --> BARS
+    IT --> TR
+    BARS --> AN
+    TR --> AN
+    BARS --> WEB
+    TR --> WEB
+    AN --> PNG[Candlestick PNG<br/>with trade markers]
+    WEB --> EXP[CSV / ZIP export]
+```
+
+All services run under Docker Compose. Both ingestion paths are idempotent:
+`bars` is deduplicated by `(symbol_id, ts, timeframe)` and `trades` by the
+normalized broker order reference `source_ref`, so re-running an import is safe.
+Database and dashboard ports are bound to `127.0.0.1` only.
 
 ## Key Features
 
@@ -23,7 +62,7 @@ Broker CSV → trades database → (overlay) → chart
 ### 1. Environment Setup
 
 1. Copy `.env.example` to `.env` and update the database settings.
-2. Create a data/ directory and place a compatible CP932-encoded broker CSV file in `data/`.
+2. Create a `data/` directory and place a compatible CP932-encoded broker CSV file in `data/`.
 3. Set `TRADE_CSV_PATH` in `.env` to the CSV path inside the container.
 
 ### 2. Services Initialization
