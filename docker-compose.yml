@@ -1,0 +1,59 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: tsdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - tsdb-data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+
+  ingest:
+    build: ./ingest
+    container_name: ingest
+    depends_on: [timescaledb]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: timescaledb
+      POSTGRES_PORT: 5432
+    volumes:
+      - ./ingest:/app
+      - ./data:/data
+
+  analysis:
+    build: ./analysis
+    env_file: .env
+    environment:
+      POSTGRES_HOST: timescaledb
+      POSTGRES_PORT: 5432
+    volumes:
+      - ./analysis:/app
+      - ./data:/data
+    depends_on:
+      - timescaledb
+
+  web:
+    build: ./web
+    container_name: web
+    env_file: .env
+    environment:
+      POSTGRES_HOST: timescaledb
+      POSTGRES_PORT: 5432
+    ports:
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - ./web:/app
+      - ./analysis:/app/analysis
+      - ./ingest:/app/ingest
+      - ./data:/data
+    depends_on:
+      - timescaledb
+
+volumes:
+  tsdb-data:

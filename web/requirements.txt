@@ -1,0 +1,7 @@
+streamlit
+psycopg[binary]
+pandas
+mplfinance
+yfinance
+matplotlib
+numpy

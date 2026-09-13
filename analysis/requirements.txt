@@ -1,0 +1,5 @@
+psycopg[binary]
+pandas
+numpy
+mplfinance
+matplotlib

@@ -1,0 +1,25 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Data & generated artifacts (Phase 3+)
+data/
+*.csv
+*.png
+*.eml
+*.msg
+*.log
+*.zip
+
+# Python & Testing Caches
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Editor & IDEs
+.vscode/
