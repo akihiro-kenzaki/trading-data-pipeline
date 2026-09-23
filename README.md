@@ -112,11 +112,19 @@ Open your browser and navigate to: **`http://localhost:8501`**
 
 This project contains no real trading credentials, sensitive personal data, or private financial records.
 
+## Tests
+
+With the project dependencies and pytest installed:
+
+```bash
+python -m pytest -q
+```
+
 ## Current Limitations
 
 - The CSV parser depends on a fixed CP932 broker-export layout.
 - Each chart interval currently displays at most one trade marker per side.
-- Automated tests, scheduling, and CI/CD have not yet been implemented.
+- Focused unit tests cover order-reference normalization and trade-marker alignment; database integration tests, scheduling, and CI/CD have not yet been implemented.
 
 ## Roadmap
 
@@ -124,5 +132,5 @@ This project contains no real trading credentials, sensitive personal data, or p
 - [x] **Phase 2** — Broker CSV ingestion and idempotent trade storage
 - [x] **Phase 3** — OHLCV backfill and static candlestick charts
 - [x] **Phase 4** — Streamlit dashboard and data exports
-- [ ] **Phase 5** — Automated tests and CI
+- [ ] **Phase 5** — Expand automated tests and add CI
 - [ ] **Phase 6** — Scheduled and incremental ingestion
