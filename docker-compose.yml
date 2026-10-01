@@ -1,22 +1,25 @@
 services:
   timescaledb:
-    image: timescale/timescaledb:latest-pg17
-    container_name: tsdb
+    image: timescale/timescaledb:2.18.0-pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - tsdb-data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   ingest:
     build: ./ingest
-    container_name: ingest
-    depends_on: [timescaledb]
     env_file:
       - .env
     environment:
@@ -25,6 +28,9 @@ services:
     volumes:
       - ./ingest:/app
       - ./data:/data
+    depends_on:
+      timescaledb:
+        condition: service_healthy
 
   analysis:
     build: ./analysis
@@ -36,11 +42,11 @@ services:
       - ./analysis:/app
       - ./data:/data
     depends_on:
-      - timescaledb
+      timescaledb:
+        condition: service_healthy
 
   web:
     build: ./web
-    container_name: web
     env_file: .env
     environment:
       POSTGRES_HOST: timescaledb
@@ -53,7 +59,8 @@ services:
       - ./ingest:/app/ingest
       - ./data:/data
     depends_on:
-      - timescaledb
+      timescaledb:
+        condition: service_healthy
 
 volumes:
   tsdb-data:
