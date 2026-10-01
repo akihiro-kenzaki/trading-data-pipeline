@@ -4,7 +4,7 @@ from analysis.plot_trades import build_markers
 
 
 @pytest.fixture
-def two_bar_data():
+def hourly_two_bar_data():
     bar_index = pd.date_range(
         "2026-01-28 09:00",
         periods=2,
@@ -15,8 +15,8 @@ def two_bar_data():
     return bar_index, df
 
 
-def test_build_markers_no_trade_return_empty_marker(two_bar_data):
-    bar_index, df = two_bar_data
+def test_build_markers_no_trade_return_empty_marker(hourly_two_bar_data):
+    bar_index, df = hourly_two_bar_data
     df_trades = pd.DataFrame(columns=["ts", "side", "price"])
     buy_markers, sell_markers = build_markers(df, df_trades, "1h")
     assert buy_markers.shape == (2,)
@@ -27,8 +27,8 @@ def test_build_markers_no_trade_return_empty_marker(two_bar_data):
     assert sell_markers.isna().all()
 
 
-def test_build_markers_has_trade_return_buy_marker(two_bar_data):
-    bar_index, df = two_bar_data
+def test_build_markers_has_trade_return_buy_marker(hourly_two_bar_data):
+    bar_index, df = hourly_two_bar_data
     data = [{"ts": "2026-01-28 09:00+09:00", "side": "buy", "price": 1500}]
     df_trades = pd.DataFrame(data=data, columns=["ts", "side", "price"])
 
@@ -38,8 +38,8 @@ def test_build_markers_has_trade_return_buy_marker(two_bar_data):
     assert sell_markers.isna().all()
 
 
-def test_build_markers_has_trade_return_sell_marker(two_bar_data):
-    bar_index, df = two_bar_data
+def test_build_markers_has_trade_return_sell_marker(hourly_two_bar_data):
+    bar_index, df = hourly_two_bar_data
     data = [{"ts": "2026-01-28 10:00+09:00", "side": "sell", "price": 1475.0}]
     df_trades = pd.DataFrame(data=data, columns=["ts", "side", "price"])
 
@@ -49,8 +49,8 @@ def test_build_markers_has_trade_return_sell_marker(two_bar_data):
     assert buy_markers.isna().all()
 
 
-def test_build_markers_aligns_trade_to_hour(two_bar_data):
-    bar_index, df = two_bar_data
+def test_build_markers_aligns_trade_to_hour(hourly_two_bar_data):
+    bar_index, df = hourly_two_bar_data
     data = [{"ts": "2026-01-28 09:37+09:00", "side": "buy", "price": 1501.0}]
     df_trades = pd.DataFrame(data=data, columns=["ts", "side", "price"])
 
@@ -60,8 +60,8 @@ def test_build_markers_aligns_trade_to_hour(two_bar_data):
     assert sell_markers.isna().all()
 
 
-def test_build_markers_ignores_trade_outside_bar_range(two_bar_data):
-    _, df = two_bar_data
+def test_build_markers_ignores_trade_outside_bar_range(hourly_two_bar_data):
+    _, df = hourly_two_bar_data
     data = [{"ts": "2026-01-28 08:37+09:00", "side": "buy", "price": 1490.0}]
     df_trades = pd.DataFrame(data=data, columns=["ts", "side", "price"])
 
