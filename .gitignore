@@ -23,3 +23,11 @@ venv/
 
 # Editor & IDEs
 .vscode/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+*.tfplan
+*.tfvars
