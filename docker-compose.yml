@@ -47,6 +47,7 @@ services:
 
   web:
     build: ./web
+    restart: unless-stopped
     env_file: .env
     environment:
       POSTGRES_HOST: timescaledb

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# Enable strict error handling, unset-variable checks, and pipeline failure detection
+set -Eeuo pipefail
+
+# Log File Setup
+touch /var/log/trading-bootstrap.log
+chmod 0600 /var/log/trading-bootstrap.log
+exec > >(tee -a /var/log/trading-bootstrap.log) 2>&1
+
+# Catch errors and log the failing line number
+trap 'rc=$?; printf "[bootstrap] ERROR line=%s exit=%s\n" "$LINENO" "$rc"; exit "$rc"' ERR
+
+# Non-interactive Setup
+export DEBIAN_FRONTEND=noninteractive
+printf '[bootstrap] START %s\n' "$(date --iso-8601=seconds)"
+
+# Install required basic tools
+printf '[bootstrap] Installing prerequisites\n'
+apt-get update
+apt-get install -y ca-certificates curl git openssl
+
+printf '[bootstrap] Adding Docker repository key\n'
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL --retry 3 https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
+# Configure the Docker apt repository for Ubuntu 24.04 (amd64)
+cat > /etc/apt/sources.list.d/docker.sources <<'EOF'
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: noble
+Components: stable
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+# Install Docker Engine and the Compose plugin
+printf '[bootstrap] Installing Docker and Compose\n'
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Start Docker now and enable it on boot
+systemctl enable --now docker
+
+# Record Docker service status and installed versions
+systemctl is-enabled docker
+systemctl is-active docker
+docker --version
+docker compose version
+
+# Clone the latest main branch on a new instance
+printf '[bootstrap] Preparing application repository\n'
+APP_DIR='/opt/trading-data-pipeline'
+
+if [ ! -d "$APP_DIR/.git" ]; then
+  git clone --branch main https://github.com/akihiro-kenzaki/trading-data-pipeline.git "$APP_DIR"
+fi
+
+# Record the deployed commit for troubleshooting
+git -C "$APP_DIR" rev-parse HEAD
+
+cd "$APP_DIR"
+mkdir -p data
+
+# Generate runtime credentials locally and preserve them on reruns
+printf '[bootstrap] Preparing runtime environment\n'
+
+if [ ! -f .env ]; then
+  ENV_TMP=$(mktemp .env.XXXXXX)
+  DB_PASSWORD=$(openssl rand -hex 32)
+
+  cat > "$ENV_TMP" <<EOF
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=$DB_PASSWORD
+POSTGRES_DB=tradesys_db
+TRADE_CSV_PATH=/data/example.csv
+EOF
+
+  mv "$ENV_TMP" .env
+  unset DB_PASSWORD
+fi
+
+chown root:root .env
+chmod 0600 .env
+test -s .env
+
+# Validate Compose without printing runtime credentials
+docker compose config --quiet
+
+# Build application images with limited parallelism
+printf '[bootstrap] Building application images\n'
+docker compose --parallel 1 build ingest analysis web
+
+# Start persistent services and wait for readiness
+printf '[bootstrap] Starting database and web\n'
+docker compose up -d --wait --wait-timeout 180 timescaledb web
+docker compose ps

@@ -101,6 +101,13 @@ resource "aws_instance" "trading" {
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.trading.id]
   key_name                    = aws_key_pair.trading.key_name
+  user_data                   = replace(file("${path.module}/bootstrap.sh.tftpl"), "\r\n", "\n")
+
+  # Ensure outbound networking is configured before first boot
+  depends_on = [
+    aws_route_table_association.public,
+    aws_vpc_security_group_egress_rule.outbound,
+  ]
 
   root_block_device {
     volume_type           = "gp3"
