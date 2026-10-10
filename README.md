@@ -42,7 +42,7 @@ flowchart LR
     YF --> BF
     YF --> IT
     CSV --> IT
-    BF --> SYM
+    BF -.- SYM
     IT --> SYM
     BF --> BARS
     IT --> BARS
@@ -55,9 +55,12 @@ flowchart LR
     WEB --> EXP[CSV / ZIP export]
 ```
 
+Solid arrows indicate data flow and writes. The dotted line indicates that `backfill_bars.py` only reads registered symbols; new symbols are created only by `import_trades.py`. The dashboard can also refresh `bars` for registered symbols through the same backfill logic.
+
 All services run under Docker Compose. Both ingestion paths are idempotent:
-`bars` is deduplicated by `(symbol_id, ts, timeframe)` and `trades` by the
-normalized broker order reference `source_ref`, so re-running an import is safe.
+`bars` are upserted on `(symbol_id, ts, timeframe)` so matching records are updated,
+and `trades` are deduplicated by the normalized broker order reference `source_ref`,
+so re-running an import is safe.
 Database and dashboard ports are bound to `127.0.0.1` only.
 
 ## Key Features
@@ -115,7 +118,7 @@ Requires Terraform 1.16.x, configured AWS credentials, and an SSH key pair.
 
 Copy `infra/terraform.tfvars.example` to `infra/terraform.tfvars`. Set the absolute public-key path and your public IPv4 address with `/32`.
 
-```powershell
+```bash
 terraform -chdir=infra init
 terraform -chdir=infra apply
 ```
@@ -124,7 +127,7 @@ Review the plan before confirming resource creation.
 
 Replace the placeholders and connect through an SSH tunnel:
 
-```powershell
+```bash
 ssh -i "<PRIVATE_KEY_PATH>" -o ServerAliveInterval=30 -L 127.0.0.1:18501:127.0.0.1:8501 ubuntu@<EC2_PUBLIC_IP>
 ```
 
