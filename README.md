@@ -2,6 +2,8 @@
 
 A personal trading data pipeline for JP equities that ingests OHLCV market data, overlays trade executions onto candlestick charts, and streamlines post-trade analysis.
 
+> **概要（日本語）**　日本株の時間足データ（yfinance）と証券会社の約定 CSV を TimescaleDB に冪等に取り込み、ローソク足チャート上に売買ポイントを重ねて振り返るための個人開発データパイプラインです。Docker Compose で動作し、Terraform による AWS EC2 へのデプロイと、再起動後の自動復旧を確認済みです。
+
 ## Demo
 
 Example chart for 8306.T, using yfinance market data and synthetic trade executions.
