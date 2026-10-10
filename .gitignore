@@ -8,6 +8,9 @@ data/*
 *.csv
 !data/example.csv
 *.png
+!data/charts/
+data/charts/*
+!data/charts/example.png
 *.eml
 *.msg
 *.log

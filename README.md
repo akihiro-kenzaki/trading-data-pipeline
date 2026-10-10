@@ -2,9 +2,17 @@
 
 A personal trading data pipeline for JP equities that ingests OHLCV market data, overlays trade executions onto candlestick charts, and streamlines post-trade analysis.
 
+## Demo
+
+Example chart for 8306.T, using yfinance market data and synthetic trade executions.
+
+![Candlestick chart with synthetic trade markers](data/charts/example.png)
+
+Blue upward triangles indicate buys; orange downward triangles indicate sells.
+
 ## Tech Stack
 
-Python, PostgreSQL/TimescaleDB, psycopg, pandas, yfinance, mplfinance, Streamlit, Docker Compose
+Python, PostgreSQL/TimescaleDB, psycopg, pandas, yfinance, mplfinance, Streamlit, Docker Compose, Terraform, AWS EC2, pytest, cloud-init
 
 ## Architecture
 
@@ -32,10 +40,12 @@ flowchart LR
     end
 
     YF --> BF
+    YF --> IT
     CSV --> IT
     BF --> SYM
     IT --> SYM
     BF --> BARS
+    IT --> BARS
     IT --> TR
     BARS --> AN
     TR --> AN
@@ -57,56 +67,80 @@ Database and dashboard ports are bound to `127.0.0.1` only.
 - **Idempotent Storage**: Uses database constraints and conflict handling to make repeated imports safe.
 - **Analysis and Export**: Displays candlestick charts with trade markers in Streamlit and exports trades and bars as CSV or ZIP files.
 
-## Getting Started
+## AWS Deployment
 
-### 1. Environment Setup
+Terraform provisions a VPC, public subnet, internet gateway, routes, security group, key pair, and EC2 instance in `ap-northeast-1`.
 
-1. Copy `.env.example` to `.env` and update the database settings.
-2. Create a `data/` directory and place a compatible CP932-encoded broker CSV file in `data/`.
-3. Set `TRADE_CSV_PATH` in `.env` to the CSV path inside the container.
+On first boot, EC2 user data installs Docker, Compose, and Git, clones this repository, generates a local `.env`, builds the application images, and starts TimescaleDB and Streamlit through Docker Compose. CSV import is performed manually.
 
-### 2. Services Initialization
+Database and dashboard ports bind to localhost. Streamlit is accessed through an SSH tunnel.
 
-Build the application images:
+Deployment was verified in October 2026 through cloud-init and bootstrap logs, database queries, dashboard rendering, PNG generation, and an EC2 reboot. Docker and the persistent containers recovered automatically, with database records preserved.
+
+## Quick Start
+
+### Local Docker
+
+Prerequisites: Git, Docker, and Docker Compose. Run the commands from the cloned repository root.
+
+Copy the environment template:
+
 ```bash
-docker compose build
+cp .env.example .env
 ```
 
-Start TimescaleDB (on the first start, `schema.sql` is applied automatically):
-```bash
-docker compose up -d timescaledb
-```
+Set your own `POSTGRES_PASSWORD` in `.env`. Keep `TRADE_CSV_PATH=/data/example.csv` to use the included synthetic sample.
 
-Check the database logs and wait until PostgreSQL reports that it is ready to accept connections:
-```bash
-docker compose logs timescaledb
-```
+Build the application images, start the persistent services, and import the sample:
 
-### 3. Pipeline Execution
-
-Import trades:
 ```bash
+docker compose --parallel 1 build ingest analysis web
+docker compose up -d --wait timescaledb web
 docker compose run --rm ingest python import_trades.py
 ```
 
-Refresh market data for all imported symbols:
-```bash
-docker compose run --rm ingest python backfill_bars.py
-```
+Open `http://127.0.0.1:8501` to view the dashboard.
 
-Generate a static chart from the command line:
+To generate a static PNG:
+
 ```bash
 docker compose run --rm analysis python plot_trades.py
 ```
 
-### 4. Run Dashboard
+Enter `8306.T` when prompted. The output is saved to `data/charts/8306_T_trades.png`.
 
-Start the Streamlit dashboard:
-```bash
-docker compose up -d web
+### AWS EC2
+
+Requires Terraform 1.16.x, configured AWS credentials, and an SSH key pair.
+
+Copy `infra/terraform.tfvars.example` to `infra/terraform.tfvars`. Set the absolute public-key path and your public IPv4 address with `/32`.
+
+```powershell
+terraform -chdir=infra init
+terraform -chdir=infra apply
 ```
 
-Open your browser and navigate to: **`http://localhost:8501`**
+Review the plan before confirming resource creation.
+
+Replace the placeholders and connect through an SSH tunnel:
+
+```powershell
+ssh -i "<PRIVATE_KEY_PATH>" -o ServerAliveInterval=30 -L 127.0.0.1:18501:127.0.0.1:8501 ubuntu@<EC2_PUBLIC_IP>
+```
+
+On EC2, wait for bootstrap and import the sample:
+
+```bash
+sudo cloud-init status --wait
+cd /opt/trading-data-pipeline
+sudo docker compose run --rm ingest python import_trades.py
+```
+
+Keep SSH open and visit `http://127.0.0.1:18501`.
+
+The root EBS volume is retained on termination to avoid accidental data loss.
+After `terraform -chdir=infra destroy`, delete the retained volume in the EC2 console to stop storage charges.
+The instance is created on demand for demonstrations and is not kept running.
 
 ## Privacy
 
@@ -124,7 +158,11 @@ python -m pytest -q
 
 - The CSV parser depends on a fixed CP932 broker-export layout.
 - Each chart interval currently displays at most one trade marker per side.
-- Focused unit tests cover order-reference normalization and trade-marker alignment; database integration tests, scheduling, and CI/CD have not yet been implemented.
+- Unit tests cover order-reference normalization, symbol lookup (with a test double), and trade-marker alignment; database integration tests, scheduling, and CI/CD have not yet been implemented.
+- Single EC2 instance without high availability; Terraform state is stored locally (no remote backend).
+- Access is SSH-tunnel only; no public HTTPS endpoint.
+- Existing `source_ref` values are skipped; reimporting a corrected CSV does not update existing trades.
+- The dashboard displays the last 180 days. The synthetic sample has fixed dates, so older sample trades may fall outside the display window over time.
 
 ## Roadmap
 
@@ -132,5 +170,6 @@ python -m pytest -q
 - [x] **Phase 2** — Broker CSV ingestion and idempotent trade storage
 - [x] **Phase 3** — OHLCV backfill and static candlestick charts
 - [x] **Phase 4** — Streamlit dashboard and data exports
-- [ ] **Phase 5** — Expand automated tests and add CI
-- [ ] **Phase 6** — Scheduled and incremental ingestion
+- [x] **Phase 5** — Terraform-provisioned AWS EC2 deployment with first-boot bootstrap
+- [ ] **Phase 6** — Expand automated tests and add CI
+- [ ] **Phase 7** — Scheduled and incremental ingestion
