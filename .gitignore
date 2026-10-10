@@ -4,8 +4,9 @@
 !.env.example
 
 # Data & generated artifacts (Phase 3+)
-data/
+data/*
 *.csv
+!data/example.csv
 *.png
 *.eml
 *.msg
