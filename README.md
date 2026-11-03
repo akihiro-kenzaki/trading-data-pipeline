@@ -163,7 +163,7 @@ python -m pytest -q
 
 - The CSV parser depends on a fixed CP932 broker-export layout.
 - Each chart interval currently displays at most one trade marker per side.
-- Unit tests cover order-reference normalization, symbol lookup (with a test double), and trade-marker alignment; database integration tests, scheduling, and CI/CD have not yet been implemented.
+- Unit tests run automatically on every push via GitHub Actions. Database integration tests and scheduled ingestion are not yet implemented.
 - Single EC2 instance without high availability; Terraform state is stored locally (no remote backend).
 - Access is SSH-tunnel only; no public HTTPS endpoint.
 - Existing `source_ref` values are skipped; reimporting a corrected CSV does not update existing trades.
